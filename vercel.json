@@ -6,7 +6,7 @@
     }
   ],
   "functions": {
-    "/index.js": {
+    "index.js": {
       "includeFiles": "node_modules/@google/genai/**"
     }
   }
