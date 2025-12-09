@@ -60,13 +60,16 @@ app.post('/analyze', async (req, res) => {
 
         const prompt = [imagePart, textPart];
 
+        // ... inside app.post('/analyze', async (req, res) => { ...
+
         const response = await gemini.models.generateContent({
-            model: "gemini-pro", // FIX: Use stable 1.5-flash model
+            model: "gemini-2.5-flash", // <--- THE FINAL, CORRECT MODEL NAME
             contents: [{ role: "user", parts: prompt }],
             config: {
                 responseMimeType: "application/json"
             }
         });
+// ...
 
         const result = JSON.parse(response.text()); // Note: .text() is a method in some SDK versions
         res.json(result);
