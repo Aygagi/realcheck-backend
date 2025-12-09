@@ -4,26 +4,24 @@ import cors from 'cors';
 import { GoogleGenAI } from '@google/genai';
 
 // --- CONFIGURATION ---
-const PORT = process.env.PORT || 3000; // Use port 3000 locally, or the port provided by the host (like Render)
-
+const PORT = process.env.PORT || 3000;
 const app = express();
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '10mb' })); // Allows large image base64 strings
+app.use(express.json({ limit: '10mb' }));
 
-// Check for API Key and initialize Gemini Client
+// Check for API Key
 if (!process.env.GEMINI_API_KEY) {
     console.error("FATAL ERROR: GEMINI_API_KEY environment variable is not set.");
-    // Exit the process if the key is missing, as the core functionality won't work
-    process.exit(1); 
+    process.exit(1);
 }
 
 const gemini = new GoogleGenAI({ 
     apiKey: process.env.GEMINI_API_KEY 
 });
 
-// --- HELPER FUNCTION: Base64 to GoogleGenerativeAI.Part ---
+// Helper: Base64 to Part
 function base64ToGenerativePart(base64String, mimeType) {
     return {
         inlineData: {
@@ -35,12 +33,12 @@ function base64ToGenerativePart(base64String, mimeType) {
 
 // --- ROUTES ---
 
-// Health Check Route (responds to the base URL)
+// Health Check
 app.get('/', (req, res) => {
     res.send("RealCheck Node.js API server is running.");
 });
 
-// Core Image Analysis Route
+// Analysis Route
 app.post('/analyze', async (req, res) => {
     try {
         const { imageBase64 } = req.body;
@@ -49,38 +47,40 @@ app.post('/analyze', async (req, res) => {
             return res.status(400).json({ error: "Missing imageBase64 in request body." });
         }
 
-        // The image data is coming from the client as a data URL (e.g., "data:image/png;base64,...")
+        // Parse Base64
         const [header, base64Data] = imageBase64.split(',');
         const mimeType = header.match(/:(.*?);/)[1];
 
         const imagePart = base64ToGenerativePart(base64Data, mimeType);
+        
+        // FIX: Wrap text in an object
+        const textPart = { 
+            text: "Analyze this image. Does it appear to be a genuine photograph or an AI-generated image? Return a JSON object with only two fields: 'is_ai' (boolean) and 'confidence' (number 0-100), and 'reason' (string)." 
+        };
 
-        const prompt = [
-            imagePart,
-            "Analyze this image. Does it appear to be a genuine photograph or an AI-generated image (e.g., using Midjourney, DALL-E, Stable Diffusion, etc.)? Return a JSON object with only the following two fields: 'is_ai' (boolean), 'confidence' (number from 0 to 100), and 'reason' (string, max 50 words explaining why). Do not include any text outside the JSON object.",
-        ];
+        const prompt = [imagePart, textPart];
 
         const response = await gemini.models.generateContent({
-            model: "gemini-2.5-flash", // Use the powerful vision model
+            model: "gemini-1.5-flash", // FIX: Use stable 1.5-flash model
             contents: [{ role: "user", parts: prompt }],
             config: {
                 responseMimeType: "application/json"
             }
         });
 
-        // The response text is already a JSON string, so we parse it and send it back.
-        const result = JSON.parse(response.text);
+        const result = JSON.parse(response.text()); // Note: .text() is a method in some SDK versions
         res.json(result);
 
     } catch (error) {
-        console.error("Gemini API or Server Error:", error);
-        // This 500 status is what you are currently seeing
-        res.status(500).json({ error: "Failed to analyze image due to an internal server error." });
+        console.error("Gemini API Error:", error);
+        res.status(500).json({ 
+            error: "Internal Server Error", 
+            details: error.message 
+        });
     }
 });
 
-
-// --- START SERVER ---
+// Start Server
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
