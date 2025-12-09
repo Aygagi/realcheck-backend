@@ -61,7 +61,7 @@ app.post('/analyze', async (req, res) => {
         const prompt = [imagePart, textPart];
 
         const response = await gemini.models.generateContent({
-            model: "gemini-pro-vision", // FIX: Use stable 1.5-flash model
+            model: "gemini-pro", // FIX: Use stable 1.5-flash model
             contents: [{ role: "user", parts: prompt }],
             config: {
                 responseMimeType: "application/json"
